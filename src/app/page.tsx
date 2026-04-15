@@ -1,117 +1,57 @@
 import Link from 'next/link';
-import { requireSupabaseData, supabaseAdmin } from '@/lib/supabase-admin';
+import { PortalSummaryCard } from '@/components/portals/portal-summary-card';
+import { AppShell } from '@/components/ui/app-shell';
+import { Panel } from '@/components/ui/panel';
+import { listDashboardPortals } from '@/lib/portals/queries';
 
 export const dynamic = 'force-dynamic';
 
-interface TenantRow {
-  id: string;
-  name: string;
-  hubspot_portal_id: string;
-  created_at: string;
-}
-
-interface SyncStatusRow {
-  tenant_id: string;
-  resource_type: string;
-  status: string;
-  items_count: number;
-  last_synced: string | null;
-}
-
-async function getTenants(): Promise<TenantRow[]> {
-  return requireSupabaseData(
-    await supabaseAdmin
-    .from('tenants')
-    .select('id, name, hubspot_portal_id, created_at')
-    .neq('id', 'shared')
-    .order('created_at', { ascending: false }),
-    'Failed to load tenants'
-  ) ?? [];
-}
-
-async function getSyncStatuses(): Promise<SyncStatusRow[]> {
-  return requireSupabaseData(
-    await supabaseAdmin
-    .from('sync_status')
-    .select('tenant_id, resource_type, status, items_count, last_synced'),
-    'Failed to load sync status'
-  ) ?? [];
-}
-
 export default async function DashboardPage() {
-  const [tenants, syncStatuses] = await Promise.all([getTenants(), getSyncStatuses()]);
-
-  const statusByTenant = new Map<string, SyncStatusRow[]>();
-  for (const s of syncStatuses) {
-    const list = statusByTenant.get(s.tenant_id) ?? [];
-    list.push(s);
-    statusByTenant.set(s.tenant_id, list);
-  }
+  const portals = await listDashboardPortals();
 
   return (
-    <div className="min-h-screen p-8 max-w-5xl mx-auto">
-      <header className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">HubSpot Copilot</h1>
+    <AppShell
+      title="HubSpot Copilot"
+      eyebrow="Overview"
+      description="A unified workspace for syncing, auditing, searching, and reviewing client HubSpot portals."
+      actions={
         <Link
           href="/settings"
-          className="px-4 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-900"
+          className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/12"
         >
-          Settings
+          Connect portal
         </Link>
-      </header>
-
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Clients</h2>
-
-        {tenants.length === 0 ? (
-          <div className="border rounded-lg p-8 text-center">
-            <p className="text-gray-600 mb-4">No clients connected yet.</p>
+      }
+    >
+      {portals.length === 0 ? (
+        <Panel className="p-10 text-center">
+          <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">Ready to onboard</p>
+          <h2 className="mt-3 text-3xl font-semibold text-white">No client portals yet</h2>
+          <p className="mx-auto mt-4 max-w-xl text-white/60">
+            Start with OAuth for long-lived client access or use a service key for a fast one-off audit.
+          </p>
+          <div className="mt-8 flex justify-center">
             <Link
-              href="/api/oauth/authorize"
-              className="inline-block px-4 py-2 bg-black text-white rounded"
+              href="/settings"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.1]"
             >
-              Connect your first HubSpot portal
+              Open settings
             </Link>
           </div>
-        ) : (
-          <div className="grid gap-4">
-            {tenants.map((tenant) => {
-              const statuses = statusByTenant.get(tenant.id) ?? [];
-              const completed = statuses.filter((s) => s.status === 'completed').length;
-              const errored = statuses.filter((s) => s.status === 'error').length;
-              const totalItems = statuses.reduce((sum, s) => sum + (s.items_count ?? 0), 0);
-
-              return (
-                <div key={tenant.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold text-lg">{tenant.name}</h3>
-                      <p className="text-sm text-gray-500">
-                        Portal ID: {tenant.hubspot_portal_id} · {tenant.id}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/settings#${tenant.id}`}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      Manage
-                    </Link>
-                  </div>
-                  <div className="text-sm text-gray-600 mt-3">
-                    {statuses.length === 0 ? (
-                      <span>Not synced yet</span>
-                    ) : (
-                      <span>
-                        {completed} synced · {errored} errors · {totalItems} items
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </div>
+        </Panel>
+      ) : (
+        <div className="grid gap-5">
+          {portals.map((portal) => (
+            <PortalSummaryCard
+              key={portal.tenant.id}
+              tenant={portal.tenant}
+              syncSummary={portal.syncSummary}
+              latestChangeResources={portal.latestChangeResources}
+              href={`/portals/${portal.tenant.id}`}
+            />
+          ))}
+        </div>
+      )}
+    </AppShell>
   );
 }

@@ -44,7 +44,7 @@ export function ServiceKeyForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-block px-4 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-900"
+        className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 transition hover:bg-white/8 hover:text-white"
       >
         Add via Service Key
       </button>
@@ -52,41 +52,44 @@ export function ServiceKeyForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border rounded-lg p-4 max-w-md">
+    <form
+      onSubmit={handleSubmit}
+      className="max-w-xl rounded-3xl border border-white/10 bg-slate-950/30 p-5"
+    >
       <div className="mb-3">
-        <label className="block text-sm font-medium mb-1">Client name</label>
+        <label className="mb-1 block text-sm font-medium text-white">Client name</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Altares"
-          className="w-full px-3 py-2 border rounded"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2.5 text-white outline-none transition placeholder:text-white/35 focus:border-cyan-300/40"
           required
         />
       </div>
 
       <div className="mb-3">
-        <label className="block text-sm font-medium mb-1">Service Key</label>
+        <label className="mb-1 block text-sm font-medium text-white">Service Key</label>
         <input
           type="password"
           value={serviceKey}
           onChange={(e) => setServiceKey(e.target.value)}
           placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          className="w-full px-3 py-2 border rounded font-mono text-xs"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2.5 font-mono text-xs text-white outline-none transition placeholder:text-white/35 focus:border-cyan-300/40"
           required
         />
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="mt-1 text-xs text-white/45">
           Created in HubSpot: Development → Keys → Service keys
         </p>
       </div>
 
-      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+      {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
 
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 bg-black text-white rounded disabled:opacity-50"
+          className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/12 disabled:opacity-50"
         >
           {loading ? 'Validating...' : 'Add tenant'}
         </button>
@@ -96,7 +99,7 @@ export function ServiceKeyForm() {
             setOpen(false);
             setError(null);
           }}
-          className="px-4 py-2 border rounded"
+          className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 transition hover:bg-white/8 hover:text-white"
         >
           Cancel
         </button>

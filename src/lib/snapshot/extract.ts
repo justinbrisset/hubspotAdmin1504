@@ -1,9 +1,11 @@
 import { Client } from '@hubspot/api-client';
 import {
+  requireSupabaseData,
   requireSupabaseOk,
   supabaseAdmin,
 } from '@/lib/supabase-admin';
 import type { ResourceType, ResourceSyncResult } from '@/types';
+import { summarizeSnapshotChange } from './diff';
 
 const PAGE_LIMIT = 100;
 const LIST_PAGE_SIZE = 250;
@@ -230,6 +232,42 @@ function countItems(data: unknown): number {
   return 0;
 }
 
+async function recordPortalChange(
+  tenantId: string,
+  resourceType: ResourceType,
+  snapshotId: string,
+  snapshotData: unknown
+): Promise<void> {
+  const previousSnapshot = requireSupabaseData(
+    await supabaseAdmin
+      .from('portal_snapshots')
+      .select('id, snapshot_data')
+      .eq('tenant_id', tenantId)
+      .eq('resource_type', resourceType)
+      .neq('id', snapshotId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    `Failed to load previous ${resourceType} snapshot`
+  );
+
+  const summary = summarizeSnapshotChange(
+    resourceType,
+    snapshotData,
+    previousSnapshot?.snapshot_data ?? null
+  );
+
+  const changeResult = await supabaseAdmin.from('portal_changes').insert({
+    tenant_id: tenantId,
+    resource_type: resourceType,
+    snapshot_id: snapshotId,
+    previous_snapshot_id: previousSnapshot?.id ?? null,
+    summary,
+  });
+
+  requireSupabaseOk(changeResult, `Failed to store ${resourceType} change summary`);
+}
+
 export async function markSyncCompleted(
   tenantId: string,
   resourceType: ResourceType,
@@ -294,13 +332,24 @@ export async function syncAllResources(
       const data = await RESOURCE_EXTRACTORS[resourceType](hubspotClient);
       const itemsCount = countItems(data);
 
-      const snapshotResult = await supabaseAdmin.from('portal_snapshots').insert({
-        tenant_id: tenantId,
-        resource_type: resourceType,
-        snapshot_data: data,
-      });
+      const insertedSnapshot = requireSupabaseData(
+        await supabaseAdmin
+          .from('portal_snapshots')
+          .insert({
+            tenant_id: tenantId,
+            resource_type: resourceType,
+            snapshot_data: data,
+          })
+          .select('id')
+          .single(),
+        `Failed to store ${resourceType} snapshot`
+      );
 
-      requireSupabaseOk(snapshotResult, `Failed to store ${resourceType} snapshot`);
+      if (!insertedSnapshot) {
+        throw new Error(`Failed to store ${resourceType} snapshot`);
+      }
+
+      await recordPortalChange(tenantId, resourceType, insertedSnapshot.id, data);
 
       results.push({ resourceType, data, itemsCount, success: true });
     } catch (err) {

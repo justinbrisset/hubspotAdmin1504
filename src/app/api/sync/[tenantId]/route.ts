@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireSession } from '@/lib/auth/request-session';
 import { getHubSpotClient } from '@/lib/hubspot/client-factory';
 import {
@@ -7,8 +8,26 @@ import {
   syncAllResources,
 } from '@/lib/snapshot/extract';
 import { transformAndEmbed } from '@/lib/snapshot/pipeline';
+import type { ResourceType } from '@/types';
+import { sendOpsNotification } from '@/lib/notifications/webhook';
 
 export const maxDuration = 300;
+
+const syncRequestSchema = z.object({
+  resourceTypes: z
+    .array(
+      z.enum([
+        'workflows',
+        'properties',
+        'pipelines',
+        'forms',
+        'lists',
+        'marketing_emails',
+        'owners',
+      ])
+    )
+    .optional(),
+});
 
 export async function POST(
   req: NextRequest,
@@ -18,10 +37,19 @@ export async function POST(
   if (denied) return denied;
 
   const { tenantId } = await params;
+  const body = syncRequestSchema.safeParse(await req.json().catch(() => ({})));
+
+  if (!body.success) {
+    return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
+  }
 
   try {
     const hubspotClient = await getHubSpotClient(tenantId);
-    const syncResults = await syncAllResources(tenantId, hubspotClient);
+    const syncResults = await syncAllResources(
+      tenantId,
+      hubspotClient,
+      body.data.resourceTypes as ResourceType[] | undefined
+    );
     const finalizedResults = [];
 
     for (const result of syncResults) {
@@ -51,6 +79,15 @@ export async function POST(
         error,
       })),
     };
+
+    if (summary.failed > 0) {
+      await sendOpsNotification({
+        title: `Manual sync reported failures for ${tenantId}`,
+        body: `${summary.failed} resource lane(s) failed during a manual portal sync.`,
+        severity: 'warning',
+        details: summary,
+      });
+    }
 
     return NextResponse.json(summary);
   } catch (err) {

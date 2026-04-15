@@ -1,15 +1,39 @@
-import { createClient, type PostgrestError } from '@supabase/supabase-js';
+import { createClient, type PostgrestError, type SupabaseClient } from '@supabase/supabase-js';
 
-if (!process.env.SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+type SupabaseAdminClient = SupabaseClient;
 
-export const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: { persistSession: false },
+let cachedClient: SupabaseAdminClient | null = null;
+
+function requireEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY'): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing ${name}`);
   }
-);
+
+  return value;
+}
+
+export function getSupabaseAdmin(): SupabaseAdminClient {
+  if (!cachedClient) {
+    cachedClient = createClient(
+      requireEnv('SUPABASE_URL'),
+      requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+      {
+        auth: { persistSession: false },
+      }
+    );
+  }
+
+  return cachedClient;
+}
+
+export const supabaseAdmin: SupabaseAdminClient = new Proxy({} as SupabaseAdminClient, {
+  get(_target, property, receiver) {
+    const client = getSupabaseAdmin();
+    const value = Reflect.get(client, property, receiver);
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+});
 
 type SupabaseResult<T> = {
   data: T;

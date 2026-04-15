@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/auth/cron-auth';
+import { sendOpsNotification } from '@/lib/notifications/webhook';
 import { requireSupabaseData, supabaseAdmin } from '@/lib/supabase-admin';
 import { getHubSpotClient } from '@/lib/hubspot/client-factory';
 import {
@@ -65,6 +66,19 @@ export async function GET(req: NextRequest) {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  const failures = results.filter(
+    (result) => !result.success || ('failed' in result && typeof result.failed === 'number' && result.failed > 0)
+  );
+
+  if (failures.length > 0) {
+    await sendOpsNotification({
+      title: 'Nightly portal sync reported failures',
+      body: `${failures.length} tenant sync run(s) need attention.`,
+      severity: 'warning',
+      details: { results: failures },
+    });
   }
 
   return NextResponse.json({ results });

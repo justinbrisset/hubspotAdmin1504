@@ -1,28 +1,12 @@
 import Link from 'next/link';
-import { requireSupabaseData, supabaseAdmin } from '@/lib/supabase-admin';
+import { AppShell } from '@/components/ui/app-shell';
+import { Panel } from '@/components/ui/panel';
+import { PortalSummaryCard } from '@/components/portals/portal-summary-card';
 import { SyncButton } from './sync-button';
 import { ServiceKeyForm } from './service-key-form';
+import { listDashboardPortals } from '@/lib/portals/queries';
 
 export const dynamic = 'force-dynamic';
-
-interface TenantRow {
-  id: string;
-  name: string;
-  hubspot_portal_id: string;
-  hubspot_token_expires_at: string | null;
-  auth_type: 'oauth' | 'service_key';
-}
-
-async function getTenants(): Promise<TenantRow[]> {
-  return requireSupabaseData(
-    await supabaseAdmin
-    .from('tenants')
-    .select('id, name, hubspot_portal_id, hubspot_token_expires_at, auth_type')
-    .neq('id', 'shared')
-    .order('created_at', { ascending: false }),
-    'Failed to load tenants'
-  ) ?? [];
-}
 
 export default async function SettingsPage({
   searchParams,
@@ -30,89 +14,96 @@ export default async function SettingsPage({
   searchParams: Promise<{ error?: string; connected?: string }>;
 }) {
   const params = await searchParams;
-  const tenants = await getTenants();
+  const portals = await listDashboardPortals();
 
   return (
-    <div className="min-h-screen p-8 max-w-5xl mx-auto">
-      <header className="flex items-center justify-between mb-8">
-        <div>
-          <Link href="/" className="text-sm text-gray-500 hover:underline">
-            ← Back to dashboard
-          </Link>
-          <h1 className="text-3xl font-bold mt-2">Settings</h1>
-        </div>
-      </header>
+    <AppShell
+      title="Settings"
+      eyebrow="Connections"
+      description="Connect new portals, run manual syncs, and manage the authentication method used for each client workspace."
+      actions={
+        <Link
+          href="/"
+          className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 transition hover:bg-white/8 hover:text-white"
+        >
+          Back to dashboard
+        </Link>
+      }
+    >
+      <div className="space-y-8">
+        {params.error ? (
+          <Panel className="border-rose-400/20 bg-rose-400/8 px-5 py-4 text-rose-100">
+            Error: {params.error}
+          </Panel>
+        ) : null}
 
-      {params.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-          Error: {params.error}
-        </div>
-      )}
-      {params.connected && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
-          Successfully connected tenant: {params.connected}
-        </div>
-      )}
+        {params.connected ? (
+          <Panel className="border-emerald-400/20 bg-emerald-400/8 px-5 py-4 text-emerald-100">
+            Successfully connected tenant: {params.connected}
+          </Panel>
+        ) : null}
 
-      <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Connect a HubSpot portal</h2>
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-3">
-            <a
-              href="/api/oauth/authorize"
-              className="inline-block px-4 py-2 bg-black text-white rounded"
-            >
-              Connect via OAuth
-            </a>
-            <ServiceKeyForm />
+        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <Panel className="p-6">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">Step 1</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Connect a new portal</h2>
+            <p className="mt-4 max-w-xl text-white/60">
+              OAuth is best when you own the long-term relationship and want token refresh handled automatically.
+              Service keys are faster for one-off diagnostic passes and ad hoc audits.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href="/api/oauth/authorize"
+                className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/12"
+              >
+                Connect via OAuth
+              </a>
+              <ServiceKeyForm />
+            </div>
+          </Panel>
+
+          <Panel className="p-6">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">Step 2</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Run a baseline sync</h2>
+            <p className="mt-4 text-white/60">
+              Once connected, open the portal workspace to establish snapshots, change history, and audit context. Every later feature depends on that first baseline.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-white/60">
+              <li>Sync portal resources into append-only snapshots</li>
+              <li>Generate a compact change summary against the prior baseline</li>
+              <li>Seed the audit and chat layers with current portal context</li>
+            </ul>
+          </Panel>
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">Connected portals</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Current workspaces</h2>
           </div>
-          <p className="text-sm text-gray-500">
-            OAuth is recommended for long-term clients (auto-refreshing tokens).
-            Service Keys are ideal for one-off audits — the client creates a key in
-            HubSpot and pastes it to you.
-          </p>
-        </div>
-      </section>
 
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Connected portals</h2>
-
-        {tenants.length === 0 ? (
-          <p className="text-gray-600">No portals connected.</p>
-        ) : (
-          <div className="grid gap-4">
-            {tenants.map((tenant) => (
-              <div key={tenant.id} id={tenant.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-lg">{tenant.name}</h3>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          tenant.auth_type === 'service_key'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {tenant.auth_type === 'service_key' ? 'Service Key' : 'OAuth'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      Portal ID: {tenant.hubspot_portal_id} · Tenant: {tenant.id}
-                    </p>
-                    {tenant.hubspot_token_expires_at && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Token expires: {new Date(tenant.hubspot_token_expires_at).toLocaleString()}
-                      </p>
-                    )}
+          {portals.length === 0 ? (
+            <Panel className="p-8 text-center text-white/55">No portals connected yet.</Panel>
+          ) : (
+            <div className="grid gap-5">
+              {portals.map((portal) => (
+                <div key={portal.tenant.id} className="space-y-3" id={portal.tenant.id}>
+                  <PortalSummaryCard
+                    tenant={portal.tenant}
+                    syncSummary={portal.syncSummary}
+                    latestChangeResources={portal.latestChangeResources}
+                    href={`/portals/${portal.tenant.id}`}
+                  />
+                  <div className="flex justify-end">
+                    <SyncButton tenantId={portal.tenant.id} />
                   </div>
                 </div>
-                <SyncButton tenantId={tenant.id} />
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </AppShell>
   );
 }

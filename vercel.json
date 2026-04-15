@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-portals",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-docs",
+      "schedule": "0 4 * * 1"
+    }
+  ],
+  "functions": {
+    "src/app/api/sync/**": {
+      "maxDuration": 300
+    },
+    "src/app/api/chat/**": {
+      "maxDuration": 60
+    }
+  }
+}

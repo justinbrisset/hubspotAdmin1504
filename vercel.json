@@ -12,9 +12,6 @@
   "functions": {
     "src/app/api/sync/**": {
       "maxDuration": 300
-    },
-    "src/app/api/chat/**": {
-      "maxDuration": 60
     }
   }
 }

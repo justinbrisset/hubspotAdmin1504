@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth/request-session';
 import { getHubSpotClient } from '@/lib/hubspot/client-factory';
 import {
   markSyncCompleted,
@@ -10,9 +11,12 @@ import { transformAndEmbed } from '@/lib/snapshot/pipeline';
 export const maxDuration = 300;
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ tenantId: string }> }
 ) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const { tenantId } = await params;
 
   try {

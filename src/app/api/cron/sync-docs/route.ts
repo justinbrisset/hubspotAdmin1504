@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/auth/cron-auth';
 import { ingestHubSpotDocs } from '@/lib/snapshot/docs-ingest';
 
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const cronDenied = verifyCronRequest(req);
+  if (cronDenied) return cronDenied;
 
   try {
     const result = await ingestHubSpotDocs();

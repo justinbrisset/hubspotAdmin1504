@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth/request-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { z } from 'zod';
 
@@ -10,6 +11,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const { id } = await params;
   const body = await req.json();
   const parsed = updateTenantSchema.safeParse(body);
@@ -31,9 +35,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const { id } = await params;
 
   if (id === 'shared') {

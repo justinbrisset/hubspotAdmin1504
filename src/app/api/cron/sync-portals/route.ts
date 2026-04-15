@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/auth/cron-auth';
 import { requireSupabaseData, supabaseAdmin } from '@/lib/supabase-admin';
 import { getHubSpotClient } from '@/lib/hubspot/client-factory';
 import {
@@ -11,10 +12,8 @@ import { transformAndEmbed } from '@/lib/snapshot/pipeline';
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const cronDenied = verifyCronRequest(req);
+  if (cronDenied) return cronDenied;
 
   const tenants = requireSupabaseData(
     await supabaseAdmin

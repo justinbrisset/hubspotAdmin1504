@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth/request-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ tenantId: string }> }
 ) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const { tenantId } = await params;
 
   const { data, error } = await supabaseAdmin

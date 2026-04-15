@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth/request-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { z } from 'zod';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const { data, error } = await supabaseAdmin
     .from('tenants')
     .select('id, name, hubspot_portal_id, created_at, updated_at')
@@ -23,6 +27,9 @@ const createTenantSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const body = await req.json();
   const parsed = createTenantSchema.safeParse(body);
 

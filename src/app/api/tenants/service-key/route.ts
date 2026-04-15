@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { requireSession } from '@/lib/auth/request-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { encrypt } from '@/lib/crypto';
 import { getPortalInfo } from '@/lib/hubspot/oauth';
@@ -10,6 +11,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const denied = await requireSession(req);
+  if (denied) return denied;
+
   const body = await req.json();
   const parsed = bodySchema.safeParse(body);
 
